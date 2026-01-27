@@ -1,23 +1,26 @@
-# abc_persona_app/app.py
+# abc_persona_app/app.py (v2.2)
 import streamlit as st
 import pandas as pd
 import json
 import time
 from openai import OpenAI
+import plotly.express as px
 
 # CSV 로딩 함수
 def load_data():
     df_a = pd.read_csv("data/A_persona_concept.csv")
     df_b = pd.read_csv("data/B_persona_maketing.csv")
     df_roles = pd.read_csv("data/A_B_C_persona.csv")
-    df_researchers = df_roles[df_roles["역할"].str.contains("연구원")]
+    if "역할" not in df_roles.columns:
+        raise ValueError("'역할' 컬럼이 A_B_C_persona.csv에 존재하지 않습니다.")
+    df_researchers = df_roles[df_roles["역할"].str.contains("연구원", na=False)]
     return df_a, df_b, df_researchers
 
 # 페르소나 요약 텍스트 생성 (기획자, 마케터, 연구원 별)
 def build_persona_context(df_a, df_b, df_researchers):
-    a_summary = df_a[["제품명/브랜드(가칭)", "카테고리", "주요 소비층", "USP(한 문장)"]].head(3).to_string(index=False)
-    b_summary = df_b.iloc[1, 0:7].dropna().to_string()
-    r_summary = df_researchers.head(3).to_string(index=False)
+    a_summary = df_a[["제품명/브랜드(가칭)", "카테고리", "주요 소비층", "USP(한 문장)"]].dropna().head(3).to_string(index=False)
+    b_summary = df_b.iloc[1:, 0:3].dropna().to_string(index=False)
+    r_summary = df_researchers.dropna().head(3).to_string(index=False)
     return a_summary, b_summary, r_summary
 
 # 사용자 입력 텍스트 생성
@@ -50,12 +53,14 @@ def build_final_prompt(a_summary, b_summary, r_summary, user_context):
 ## 사용자 입력 정보
 {user_context}
 
-위 정보를 기반으로 아래 JSON 구조로 결과를 생성해줘:
-{{
-  "A": {{ "name": ..., "slogan": ..., "functionality": ... }},
-  "B": {{ "target_fit": ..., "uniqueness": ..., "marketability": ..., "summary": ... }},
-  "C": {{ "원료명": "함량%", ... }}
-}}
+[지금 할 일]
+1. 최근 트렌드 기반으로 10개 제품 컨셉을 생성해줘.
+2. 각 컨셉은 맛 조합 / 기능성 포인트 / 타깃 소비층 / 점수(0~100)를 포함해야 해.
+3. 아래 JSON 구조로 응답해줘:
+[
+  {{ "name": ..., "flavor": ..., "functionality": ..., "target": ..., "score": ... }},
+  ... (총 10개)
+]
 """
 
 # OpenAI 호출 함수
@@ -76,10 +81,14 @@ def call_openai(api_key, prompt):
 # Streamlit 앱 시작
 def main():
     st.set_page_config(page_title="ABC 페르소나 순환 제품개발", layout="wide")
-    st.title("🥤 ABC 페르소나 순환 제품개발 앱")
+    st.title("🥤 ABC 페르소나 순환 제품개발 앱 v2.2")
 
     # 데이터 로딩
-    df_a, df_b, df_researchers = load_data()
+    try:
+        df_a, df_b, df_researchers = load_data()
+    except Exception as e:
+        st.error(f"❌ 데이터 로딩 오류: {e}")
+        return
 
     # 사용자 입력
     with st.sidebar:
@@ -98,7 +107,7 @@ def main():
         api_key = st.text_input("🔑 OpenAI API Key", type="password")
 
     # 실행 버튼
-    if st.button("🚀 STEP A/B/C 결과 생성", type="primary"):
+    if st.button("🚀 STEP A: 제품 컨셉 후보 생성", type="primary"):
         user_inputs = {
             "goal": goal,
             "category": category,
@@ -126,22 +135,22 @@ def main():
             st.error(f"❌ 오류 발생: {err}")
             return
 
-        st.success("✅ 분석 완료")
+        st.success("✅ 후보 컨셉 생성 완료")
 
-        # 결과 출력
-        col1, col2, col3 = st.columns(3)
+        # 점수 그래프 시각화
+        st.markdown("### 📈 컨셉 점수 시각화")
+        df_result = pd.DataFrame(result)
+        fig = px.bar(df_result.sort_values("score", ascending=False), x="name", y="score",
+                     color="score", color_continuous_scale="Plasma")
+        st.plotly_chart(fig, use_container_width=True)
 
-        with col1:
-            st.markdown("### A. 제품 컨셉")
-            st.json(result.get("A", {}))
-
-        with col2:
-            st.markdown("### B. 마케팅 평가")
-            st.json(result.get("B", {}))
-
-        with col3:
-            st.markdown("### C. 제품 배합비")
-            st.json(result.get("C", {}))
+        # 컨셉 리스트 출력
+        st.markdown("### 🎨 추천 컨셉 Top 10")
+        for i, item in enumerate(result):
+            with st.expander(f"#{i+1}. {item['name']} ({item['score']}/100)"):
+                st.markdown(f"**맛 조합**: {item['flavor']}")
+                st.markdown(f"**기능성 포인트**: {item['functionality']}")
+                st.markdown(f"**타깃 소비층**: {item['target']}")
 
 if __name__ == "__main__":
     main()
