@@ -10,25 +10,21 @@ def load_data():
     df_a = pd.read_csv("data/A_persona_concept.csv")
     df_b = pd.read_csv("data/B_persona_maketing.csv")
     df_roles = pd.read_csv("data/A_B_C_persona.csv")
-    df_roles.columns = df_roles.columns.str.strip()  # 공백 제거
-    role_col = None
-    for col in df_roles.columns:
-        if col.strip() in ["역할", "role"]:
-            role_col = col
-            break
-    if role_col is None:
-        raise KeyError("'역할' 또는 'role' 컬럼이 존재하지 않습니다.")
+    role_col = next((col for col in df_roles.columns if col.strip() in ["역할", "role"]), None)
+    if not role_col:
+        st.error("❌ 데이터 로딩 오류: '역할' 또는 'role' 컬럼을 찾을 수 없습니다")
+        st.stop()
     df_researchers = df_roles[df_roles[role_col].str.contains("연구원", na=False)]
     return df_a, df_b, df_researchers
 
-# 페르소나 요약 텍스트 생성 (기획자, 마케터, 연구원 별)
+# 페르소나 요약 텍스트 생성
 def build_persona_context(df_a, df_b, df_researchers):
-    a_summary = df_a["USP(한 문장)"].dropna().head(3).to_string(index=False)
+    a_summary = df_a[["제품명/브랜드(가칭)", "카테고리", "주요 소비층", "USP(한 문장)"]].dropna().head(3).to_string(index=False)
     b_summary = df_b.iloc[1:, 0:3].dropna().to_string(index=False)
     r_summary = df_researchers.dropna().head(3).to_string(index=False)
     return a_summary, b_summary, r_summary
 
-# 사용자 입력 텍스트 생성
+# 사용자 입력 요약
 def build_user_context(user_inputs):
     return f"""
 제품 목표: {user_inputs['goal']}
@@ -41,8 +37,8 @@ def build_user_context(user_inputs):
 출시 목표일: {user_inputs['launch_date']}
 """
 
-# 프롬프트 생성 함수
-def build_final_prompt(a_summary, b_summary, r_summary, user_context):
+# STEP A 프롬프트 생성
+def build_step_a_prompt(a_summary, b_summary, r_summary, user_context):
     return f"""
 # ABC 페르소나 기반 순환 제품개발
 
@@ -68,6 +64,35 @@ def build_final_prompt(a_summary, b_summary, r_summary, user_context):
 ]
 """
 
+# STEP B 프롬프트 생성
+def build_step_b_prompt(concept, a_summary, b_summary):
+    return f"""
+다음 제품 컨셉에 대해 마케팅 전략을 B 페르소나의 시각으로 작성해줘.
+
+📌 제품명: {concept['name']}
+📌 맛 조합: {concept['flavor']}
+📌 기능성: {concept['functionality']}
+📌 타깃: {concept['target']}
+
+[참고: A페르소나 요약]
+{a_summary}
+
+[참고: B페르소나 요약]
+{b_summary}
+
+💡 마케팅 전략을 아래와 같은 5개 항목으로 출력해줘:
+1. 핵심 USP 요약 (한 줄)
+2. 고객 인사이트 / 페인포인트
+3. 시장 포지셔닝
+4. 적합한 광고 메시지 예시
+5. 추천 판매 채널
+
+아래 JSON 형식으로 출력:
+{{
+  "usp": ..., "insight": ..., "positioning": ..., "message": ..., "channel": ...
+}}
+"""
+
 # OpenAI 호출 함수
 def call_openai(api_key, prompt):
     client = OpenAI(api_key=api_key)
@@ -86,26 +111,11 @@ def call_openai(api_key, prompt):
 # Streamlit 앱 시작
 def main():
     st.set_page_config(page_title="ABC 페르소나 순환 제품개발", layout="wide")
-    col_left, col_right = st.columns([0.3, 0.7])
+    st.title("🥤 ABC 페르소나 순환 제품개발 앱 v2.2.4")
 
-    with col_left:
-        st.title("🥤 ABC 페르소나 순환 제품개발 앱 v2.2.4")
-        st.subheader("◀ LEFT ▶ 입력 / 선택 패널")
-        st.markdown("""
-        **PRE-STEP:** 사전 기획 정의
+    df_a, df_b, df_researchers = load_data()
 
-        **STEP 0:** 시장·트렌드 입력
-
-        **STEP A:** 제품 컨셉
-
-        **STEP B:** 마케팅 전략 (B)
-
-        **STEP C:** 배합비 개발 (C)
-
-        **STEP R:** 요약 & 과제
-        """)
-
-        st.divider()
+    with st.sidebar:
         st.header("STEP 0. 기획자 입력 (A 페르소나)")
         goal = st.selectbox("제품 개발 목표", ["신제품 개발", "기존 제품 개선"])
         category = st.selectbox("제품 카테고리", ["RTD 티", "기능성 워터", "프리바이오틱 소다"])
@@ -120,52 +130,58 @@ def main():
 
         api_key = st.text_input("🔑 OpenAI API Key", type="password")
 
-        if st.button("🚀 STEP A: 제품 컨셉 후보 생성", type="primary"):
-            user_inputs = {
-                "goal": goal,
-                "category": category,
-                "price": price,
-                "season": season,
-                "channels": channels,
-                "market_env": market_env,
-                "trends": trends,
-                "launch_date": launch_date,
-            }
+    if st.button("🚀 STEP A: 제품 컨셉 후보 생성", type="primary"):
+        user_inputs = {
+            "goal": goal,
+            "category": category,
+            "price": price,
+            "season": season,
+            "channels": channels,
+            "market_env": market_env,
+            "trends": trends,
+            "launch_date": launch_date,
+        }
 
-            df_a, df_b, df_researchers = load_data()
-            a_summary, b_summary, r_summary = build_persona_context(df_a, df_b, df_researchers)
-            user_context = build_user_context(user_inputs)
-            prompt = build_final_prompt(a_summary, b_summary, r_summary, user_context)
+        a_summary, b_summary, r_summary = build_persona_context(df_a, df_b, df_researchers)
+        user_context = build_user_context(user_inputs)
+        prompt = build_step_a_prompt(a_summary, b_summary, r_summary, user_context)
 
-            st.subheader("📄 생성된 프롬프트")
-            st.code(prompt, language="markdown")
+        st.subheader("📄 생성된 프롬프트 (STEP A)")
+        st.code(prompt, language="markdown")
 
-            with st.spinner("AI 분석 중..."):
-                result, err = call_openai(api_key, prompt)
+        with st.spinner("AI 분석 중..."):
+            result, err = call_openai(api_key, prompt)
 
-            if err:
-                st.error(f"❌ 오류 발생: {err}")
-                return
+        if err:
+            st.error(f"❌ 오류 발생: {err}")
+            return
 
-            st.success("✅ 후보 컨셉 생성 완료")
+        st.success("✅ 후보 컨셉 생성 완료")
+        st.markdown("### 🎨 추천 컨셉 Top 5")
+        selected_concept = None
 
-            st.markdown("### 🎨 추천 컨셉 Top 10")
-            for i, item in enumerate(result):
-                with st.expander(f"#{i+1}. {item['name']} ({item['score']}/100)"):
-                    st.markdown(f"**맛 조합**: {item['flavor']}")
-                    st.markdown(f"**기능성 포인트**: {item['functionality']}")
-                    st.markdown(f"**타깃 소비층**: {item['target']}")
+        for i, item in enumerate(result[:5]):
+            if st.button(f"선택 → #{i+1}. {item['name']} ({item['score']}/100)"):
+                selected_concept = item
+                st.session_state["selected_concept"] = item
 
-    with col_right:
-        st.subheader("▶ RIGHT ◀ 출력 & 시각화 대시보드")
-        st.markdown("""
-        📌 사전기획 요약 카드  
-        🧠 AI 사고 프로세스 그래프  
-        🍓 컨셉 카드 / 관능 맵  
-        📊 3C·SWOT / 점수 / 의사결정  
-        🧪 배합비 테이블 / 그래프  
-        📜 전체 스토리 + 과제
-        """)
+        if "selected_concept" in st.session_state:
+            concept = st.session_state["selected_concept"]
+            st.markdown(f"### 🔄 STEP B: 마케팅 전략 생성 대상 → {concept['name']}")
+
+            step_b_prompt = build_step_b_prompt(concept, a_summary, b_summary)
+            st.code(step_b_prompt, language="markdown")
+
+            if st.button("🧠 STEP B 실행: 마케팅 전략 생성"):
+                with st.spinner("AI 마케팅 전략 분석 중..."):
+                    result_b, err_b = call_openai(api_key, step_b_prompt)
+
+                if err_b:
+                    st.error(f"❌ STEP B 오류: {err_b}")
+                    return
+
+                st.success("✅ 마케팅 전략 생성 완료")
+                st.json(result_b)
 
 if __name__ == "__main__":
     main()
