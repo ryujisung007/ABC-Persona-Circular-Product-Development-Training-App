@@ -1,34 +1,24 @@
-# abc_persona_app/app.py (v2.2.2 - 역할 컬럼 정규화 및 BOM 대응 포함)
+# abc_persona_app/app.py (v2.2.3 - 리디자인 포함)
 import streamlit as st
 import pandas as pd
 import json
 import time
 from openai import OpenAI
-import plotly.express as px
 
-# CSV 로딩 함수 (컬럼 정규화 및 BOM 대응 포함)
+# CSV 로딩 함수
+@st.cache_data
 def load_data():
     df_a = pd.read_csv("data/A_persona_concept.csv", encoding="utf-8-sig")
     df_b = pd.read_csv("data/B_persona_maketing.csv", encoding="utf-8-sig")
-    df_roles_raw = pd.read_csv("data/A_B_C_persona.csv", encoding="utf-8-sig")
+    df_roles = pd.read_csv("data/A_B_C_persona.csv", encoding="utf-8-sig")
 
-    # 컬럼명 정규화: 공백 제거 + 소문자 변환 + BOM 제거
-    df_roles_raw.columns = df_roles_raw.columns.str.strip().str.lower().str.replace("\ufeff", "")
-
-    # 컬럼명 출력 (디버깅용)
-    st.write("🔍 A_B_C_persona.csv의 컬럼 목록:", df_roles_raw.columns.tolist())
-
-    # 역할 컬럼 탐색
-    role_col = None
-    for col in df_roles_raw.columns:
-        if col in ['역할', 'role']:
-            role_col = col
-            break
+    df_roles.columns = [col.strip().replace("\ufeff", "").lower() for col in df_roles.columns]
+    role_col = next((col for col in df_roles.columns if col in ["역할", "role"]), None)
 
     if not role_col:
-        raise ValueError("'역할' 또는 'role' 컬럼을 찾을 수 없습니다.")
+        raise ValueError("'역할' 또는 'role' 컬럼이 A_B_C_persona.csv에 존재하지 않습니다.")
 
-    df_researchers = df_roles_raw[df_roles_raw[role_col].str.contains("연구원", na=False)]
+    df_researchers = df_roles[df_roles[role_col].str.contains("연구원", na=False)]
     return df_a, df_b, df_researchers
 
 # 페르소나 요약 텍스트 생성 (기획자, 마케터, 연구원 별)
@@ -70,7 +60,7 @@ def build_final_prompt(a_summary, b_summary, r_summary, user_context):
 
 [지금 할 일]
 1. 최근 트렌드 기반으로 10개 제품 컨셉을 생성해줘.
-2. 각 컨셉은 맛 조합 / 기능성 포인트 / 타깃 소비층 / 점수(0~100)를 포함해야 해.
+2. 각 컨셉은 맛 조합 / 기능성 포인트 / 타깃 소비층을 포함해야 해.
 3. 아래 JSON 구조로 응답해줘:
 [
   {{ "name": ..., "flavor": ..., "functionality": ..., "target": ..., "score": ... }},
@@ -96,16 +86,45 @@ def call_openai(api_key, prompt):
 # Streamlit 앱 시작
 def main():
     st.set_page_config(page_title="ABC 페르소나 순환 제품개발", layout="wide")
-    st.title("🥤 ABC 페르소나 순환 제품개발 앱 v2.2.2")
+    st.markdown("""
+        <style>
+        .big-title { font-size: 36px; font-weight: bold; color: #b30059; }
+        .subtitle { font-size: 20px; font-weight: 500; color: #333; }
+        .step-box { background: #f9f9f9; padding: 1rem; border-radius: 12px; margin-bottom: 1rem; box-shadow: 1px 1px 5px rgba(0,0,0,0.05); }
+        </style>
+    """, unsafe_allow_html=True)
 
-    # 데이터 로딩
-    try:
-        df_a, df_b, df_researchers = load_data()
-    except Exception as e:
-        st.error(f"❌ 데이터 로딩 오류: {e}")
-        return
+    st.markdown("<div class='big-title'>🥤 ABC 페르소나 순환 제품개발 앱 v2.2.3</div>", unsafe_allow_html=True)
 
-    # 사용자 입력
+    df_a, df_b, df_researchers = load_data()
+
+    # STEP 패널 구성
+    left, right = st.columns([1, 1])
+
+    with left:
+        st.markdown("<div class='subtitle'>◀ LEFT ▶ \n**입력 / 선택 패널**</div>", unsafe_allow_html=True)
+        st.markdown("""
+        <div class='step-box'>**PRE-STEP.** 사전 기획 정의</div>
+        <div class='step-box'>**STEP 0.** 시장·트렌드 입력</div>
+        <div class='step-box'>**STEP A.** 제품 컨셉</div>
+        <div class='step-box'>**STEP B.** 마케팅 전략 (B)</div>
+        <div class='step-box'>**STEP C.** 배합비 개발 (C)</div>
+        <div class='step-box'>**STEP R.** 요약 & 과제</div>
+        """, unsafe_allow_html=True)
+
+    with right:
+        st.markdown("<div class='subtitle'>▶ RIGHT ◀ \n**출력 & 시각화 대시보드**</div>", unsafe_allow_html=True)
+        st.markdown("""
+        <div class='step-box'>📌 사전기획 요약 카드</div>
+        <div class='step-box'>🧠 AI 사고 프로세스 그래프</div>
+        <div class='step-box'>🎨 컨셉 카드 / 관능 맵</div>
+        <div class='step-box'>📊 3C·SWOT / 점수 / 의사결정</div>
+        <div class='step-box'>🧪 배합비 테이블 / 그래프</div>
+        <div class='step-box'>📝 전체 스토리 + 과제</div>
+        """, unsafe_allow_html=True)
+
+    st.divider()
+
     with st.sidebar:
         st.header("STEP 0. 기획자 입력 (A 페르소나)")
         goal = st.selectbox("제품 개발 목표", ["신제품 개발", "기존 제품 개선"])
@@ -121,7 +140,6 @@ def main():
 
         api_key = st.text_input("🔑 OpenAI API Key", type="password")
 
-    # 실행 버튼
     if st.button("🚀 STEP A: 제품 컨셉 후보 생성", type="primary"):
         user_inputs = {
             "goal": goal,
@@ -134,7 +152,6 @@ def main():
             "launch_date": launch_date,
         }
 
-        # 컨텍스트 생성
         a_summary, b_summary, r_summary = build_persona_context(df_a, df_b, df_researchers)
         user_context = build_user_context(user_inputs)
         prompt = build_final_prompt(a_summary, b_summary, r_summary, user_context)
@@ -142,7 +159,6 @@ def main():
         st.subheader("📄 생성된 프롬프트")
         st.code(prompt, language="markdown")
 
-        # AI 호출
         with st.spinner("AI 분석 중..."):
             result, err = call_openai(api_key, prompt)
 
@@ -151,21 +167,13 @@ def main():
             return
 
         st.success("✅ 후보 컨셉 생성 완료")
-
-        # 점수 그래프 시각화
-        st.markdown("### 📈 컨셉 점수 시각화")
-        df_result = pd.DataFrame(result)
-        fig = px.bar(df_result.sort_values("score", ascending=False), x="name", y="score",
-                     color="score", color_continuous_scale="Plasma")
-        st.plotly_chart(fig, use_container_width=True)
-
-        # 컨셉 리스트 출력
         st.markdown("### 🎨 추천 컨셉 Top 10")
+
         for i, item in enumerate(result):
             with st.expander(f"#{i+1}. {item['name']} ({item['score']}/100)"):
                 st.markdown(f"**맛 조합**: {item['flavor']}")
                 st.markdown(f"**기능성 포인트**: {item['functionality']}")
-                st.markdown(f"**타깃 소비층**: {item['target']}\n")
+                st.markdown(f"**타깃 소비층**: {item['target']}")
 
 if __name__ == "__main__":
     main()
