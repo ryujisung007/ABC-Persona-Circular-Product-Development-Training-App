@@ -284,20 +284,10 @@ def A_to_B_payload(a: Dict[str, Any]) -> str:
         "  \"scores\": {\"company_fit\":1,\"cost_stability\":1,\"manufacturability\":1,\"customer_acceptance\":1,\"repurchase\":1},\n"
         "  \"weighted_score\": 0.0,\n"
         "  \"decision\": \"GO|HOLD|DROP\",\n"
-        "  \"3c_swot_summary\": {\"3c\": {\"company\":\"...\",\"customer\":\"...\",\"competitor\":\"...\"}, \"swot\": {\"strengths\":["..."] ,\"weaknesses\":["..."] ,\"opportunities\":["..."] ,\"threats\":["..."]}},\n"
+        "  \"3c_swot_summary\": {\"3c\": {\"company\":\"...\",\"customer\":\"...\",\"competitor\":\"...\"}, \"swot\": {\"strengths\":[\"...\"], \"weaknesses\":[\"...\"], \"opportunities\":[\"...\"], \"threats\":[\"...\"]}},\n"
         "  \"improvement_comments\": [\"...\"]\n"
         "}\n"
-    )
-
-
-def B_to_C_payload(
-    a: Dict[str, Any],
-    b: Dict[str, Any],
-    product_type: str,
-    product_category: str,
-    packaging: str,
-    price: str,
-) -> str:
+    ) -> str:
     return (
         "[컨텍스트]\n"
         f"- 제품유형: {product_type}\n"
