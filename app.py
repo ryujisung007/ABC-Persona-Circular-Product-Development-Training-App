@@ -1,4 +1,4 @@
-# abc_persona_app/app.py (v2.2.1 - 역할 컬럼 오류 처리 포함)
+# abc_persona_app/app.py (v2.2.2 - 역할 컬럼 정규화 및 BOM 대응 포함)
 import streamlit as st
 import pandas as pd
 import json
@@ -6,19 +6,22 @@ import time
 from openai import OpenAI
 import plotly.express as px
 
-# CSV 로딩 함수 (역할 컬럼 유연 처리)
+# CSV 로딩 함수 (컬럼 정규화 및 BOM 대응 포함)
 def load_data():
-    df_a = pd.read_csv("data/A_persona_concept.csv")
-    df_b = pd.read_csv("data/B_persona_maketing.csv")
-    df_roles_raw = pd.read_csv("data/A_B_C_persona.csv")
+    df_a = pd.read_csv("data/A_persona_concept.csv", encoding="utf-8-sig")
+    df_b = pd.read_csv("data/B_persona_maketing.csv", encoding="utf-8-sig")
+    df_roles_raw = pd.read_csv("data/A_B_C_persona.csv", encoding="utf-8-sig")
 
-    # 모든 컬럼 이름 공백 제거
-    df_roles_raw.columns = df_roles_raw.columns.str.strip()
+    # 컬럼명 정규화: 공백 제거 + 소문자 변환 + BOM 제거
+    df_roles_raw.columns = df_roles_raw.columns.str.strip().str.lower().str.replace("\ufeff", "")
 
-    # '역할' 또는 'role' 컬럼 탐색
+    # 컬럼명 출력 (디버깅용)
+    st.write("🔍 A_B_C_persona.csv의 컬럼 목록:", df_roles_raw.columns.tolist())
+
+    # 역할 컬럼 탐색
     role_col = None
     for col in df_roles_raw.columns:
-        if col.lower() in ['역할', 'role']:
+        if col in ['역할', 'role']:
             role_col = col
             break
 
@@ -93,7 +96,7 @@ def call_openai(api_key, prompt):
 # Streamlit 앱 시작
 def main():
     st.set_page_config(page_title="ABC 페르소나 순환 제품개발", layout="wide")
-    st.title("🥤 ABC 페르소나 순환 제품개발 앱 v2.2.1")
+    st.title("🥤 ABC 페르소나 순환 제품개발 앱 v2.2.2")
 
     # 데이터 로딩
     try:
