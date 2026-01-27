@@ -1,4 +1,4 @@
-# abc_persona_app/app.py (v2.2)
+# abc_persona_app/app.py (v2.2.1 - 역할 컬럼 오류 처리 포함)
 import streamlit as st
 import pandas as pd
 import json
@@ -6,14 +6,26 @@ import time
 from openai import OpenAI
 import plotly.express as px
 
-# CSV 로딩 함수
+# CSV 로딩 함수 (역할 컬럼 유연 처리)
 def load_data():
     df_a = pd.read_csv("data/A_persona_concept.csv")
     df_b = pd.read_csv("data/B_persona_maketing.csv")
-    df_roles = pd.read_csv("data/A_B_C_persona.csv")
-    if "역할" not in df_roles.columns:
-        raise ValueError("'역할' 컬럼이 A_B_C_persona.csv에 존재하지 않습니다.")
-    df_researchers = df_roles[df_roles["역할"].str.contains("연구원", na=False)]
+    df_roles_raw = pd.read_csv("data/A_B_C_persona.csv")
+
+    # 모든 컬럼 이름 공백 제거
+    df_roles_raw.columns = df_roles_raw.columns.str.strip()
+
+    # '역할' 또는 'role' 컬럼 탐색
+    role_col = None
+    for col in df_roles_raw.columns:
+        if col.lower() in ['역할', 'role']:
+            role_col = col
+            break
+
+    if not role_col:
+        raise ValueError("'역할' 또는 'role' 컬럼을 찾을 수 없습니다.")
+
+    df_researchers = df_roles_raw[df_roles_raw[role_col].str.contains("연구원", na=False)]
     return df_a, df_b, df_researchers
 
 # 페르소나 요약 텍스트 생성 (기획자, 마케터, 연구원 별)
@@ -81,7 +93,7 @@ def call_openai(api_key, prompt):
 # Streamlit 앱 시작
 def main():
     st.set_page_config(page_title="ABC 페르소나 순환 제품개발", layout="wide")
-    st.title("🥤 ABC 페르소나 순환 제품개발 앱 v2.2")
+    st.title("🥤 ABC 페르소나 순환 제품개발 앱 v2.2.1")
 
     # 데이터 로딩
     try:
@@ -150,7 +162,7 @@ def main():
             with st.expander(f"#{i+1}. {item['name']} ({item['score']}/100)"):
                 st.markdown(f"**맛 조합**: {item['flavor']}")
                 st.markdown(f"**기능성 포인트**: {item['functionality']}")
-                st.markdown(f"**타깃 소비층**: {item['target']}")
+                st.markdown(f"**타깃 소비층**: {item['target']}\n")
 
 if __name__ == "__main__":
     main()
