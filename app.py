@@ -1,138 +1,162 @@
-# abc-persona-circular-product-development-training-app/app.py
-
-
 import streamlit as st
-import pandas as pd
+from openai import OpenAI, RateLimitError, AuthenticationError, BadRequestError
 import time
 import json
-import hashlib
-import openai
-from typing import Dict, Any
 
-st.set_page_config(page_title="ABC Persona Product Dev", layout="wide")
-st.code(prompt, language="markdown")
-# 캐시 키 생성용 해시
-
-def hash_input(obj: Any) -> str:
-    return hashlib.sha256(json.dumps(obj, sort_keys=True).encode()).hexdigest()
-
-# OpenAI 호출 래퍼 (temperature 제거)
-
-def call_openai_once(api_key: str, prompt: str, model: str = "o4-mini") -> tuple[Dict, float]:
-    from openai import OpenAI
+# 🧠 OpenAI 호출 함수
+def call_openai_once(api_key: str, prompt: str, model: str = "gpt-4"):
     client = OpenAI(api_key=api_key)
-    start = time.time()
+    t0 = time.time()
+
     try:
-        resp = client.responses.create(
+        response = client.chat.completions.create(
             model=model,
-            input=prompt
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7,
         )
-        end = time.time()
-        return json.loads(resp.output_text), round(end - start, 2)
+        elapsed = time.time() - t0
+        content = response.choices[0].message.content.strip()
+
+        # JSON 파싱 시도
+        try:
+            parsed = json.loads(content)
+        except json.JSONDecodeError:
+            parsed = {"A": {}, "B": {}, "C": {}}
+
+        return parsed, elapsed, None
+
+    except RateLimitError as e:
+        if "insufficient_quota" in str(e):
+            return None, None, "❌ OpenAI 크레딧이 부족합니다. 결제 또는 예산을 확인하세요."
+        return None, None, "⚠️ 요청이 너무 많아 일시적으로 제한되었습니다."
+
+    except AuthenticationError:
+        return None, None, "❌ 잘못된 API 키입니다."
+
+    except BadRequestError as e:
+        return None, None, f"❌ 잘못된 요청입니다: {e}"
+
     except Exception as e:
-        st.error(f"❌ AI 실행 실패: {str(e)}")
-        raise
+        return None, None, f"❌ 알 수 없는 오류: {e}"
 
-# 사용자 입력 수집
 
-def collect_inputs() -> Dict:
+# 📦 Prompt 생성 함수
+def generate_prompt(info):
+    return f"""
+ABC 페르소나 순환 제품개발을 위한 신제품 제안서를 만들어줘. 아래 항목에 따라 결과는 JSON 형식으로 출력해줘.
+
+🧾 조건 요약:
+- 제품 목표: {info['goal']}
+- 카테고리: {info['category']}
+- 가격대: {info['price']}
+- 출시시즌: {info['season']}
+- 판매채널: {', '.join(info['channels'])}
+- 출시일: {info['launch_date']}
+- 시장환경: {info['market_env']}
+- 트렌드 키워드: {', '.join(info['trends'])}
+
+🎯 응답 형식(JSON) 예시:
+{{
+  "A": {{
+    "name": "레몬버블",
+    "slogan": "톡 쏘는 레몬, 건강한 하루",
+    "functionality": "면역 강화 + 수분 보충"
+  }},
+  "B": {{
+    "target_fit": "20-30대 여성 건강志向과 부합",
+    "uniqueness": "국내산 오미자 기반 탄산음료",
+    "marketability": "기존 헬스워터 시장과 차별화됨",
+    "summary": "건강과 트렌드를 모두 잡은 여름 제품"
+  }},
+  "C": {{
+    "오미자농축액": "5%",
+    "레몬즙": "3%",
+    "탄산수": "90%",
+    "기타": "2%"
+  }}
+}}
+"""
+
+
+# 🚀 Streamlit 앱 메인 함수
+def main():
+    st.set_page_config(page_title="ABC 페르소나 순환 제품개발 앱", layout="wide")
+    st.title("🥤 ABC 페르소나 순환 제품개발 앱")
+
+    # ✅ 좌측 입력 폼
     with st.sidebar:
-        st.header("🧩 STEP 0. 제품 사전 기획")
-        goal = st.selectbox("제품 개발 목표", ["완전 신제품", "기존 라인 확장", "패키지 리뉴얼"])
-        category = st.selectbox("제품 카테고리", ["탄산음료", "RTD 주스", "기능성 음료"])
-        price = st.selectbox("희망 가격대", ["1000원", "1500원", "2000원 이상"])
-        channel = st.multiselect("판매 채널", ["CU", "GS25", "마켓컬리", "온라인몰", "이마트"])
+        st.header("제품 개발 목표")
+        goal = st.selectbox("제품 목표", ["완전 신제품", "기존 제품 개선"])
+
+        category = st.selectbox("제품 카테고리", ["탄산음료", "RTD 주스", "차음료", "기능성음료"])
+        price = st.selectbox("희망 가격대", ["2000원 미만", "2000원 이상"])
         season = st.radio("출시 시즌", ["봄", "여름", "가을", "겨울"])
 
-        st.markdown("---")
-        st.header("🌐 STEP 1. 시장 환경 입력")
-        date = st.text_input("출시 목표일 (YYYY-MM)", "2026-05")
-        market_env = st.text_area("시장 환경 요약", "2030세대 증가, 고령화, 1인가구 확대 등")
-        trends = st.multiselect("적용 트렌드", ["웰빙", "새로운 맛", "뉴니스", "차별화", "기능성"])
-        target_20f = st.text_input("20대 여성 소비자 특징", "운동을 좋아하고 직장 초년생")
-        target_30m = st.text_input("30대 남성 소비자 특징", "여행, 건강소비는 아끼지 않음")
-        packaging = st.text_input("선호 포장 형태", "페트병 + 친환경 소재")
+        channels = st.multiselect("판매 채널", ["편의점", "대형마트", "온라인몰", "카페", "마켓컬리"])
 
-    return {
-        "goal": goal,
-        "category": category,
-        "price_tier": price,
-        "channels": channel,
-        "season": season,
-        "launch_date": date,
-        "market_env": market_env,
-        "trends": trends,
-        "target_20f": target_20f,
-        "target_30m": target_30m,
-        "packaging": packaging,
-    }
+        st.markdown("### STEP 1. 시장 환경 입력")
+        launch_date = st.text_input("출시 목표일 (YYYY-MM)", value="2026-05")
+        market_env = st.text_area("시장 환경 요약", value="2030세대 증가, 고령화, 1인가구 확대 등")
 
-# 프롬프트 생성기
+        trends = st.multiselect("적용 트렌드", ["차별화", "뉴니스", "기능성", "저당", "친환경"])
 
-def create_ai_prompt(inputs: Dict) -> str:
-    lines = [
-        f"[기획목표]\n{inputs['goal']}",
-        f"[카테고리]\n{inputs['category']}",
-        f"[희망가격대]\n{inputs['price_tier']}",
-        f"[출시시즌]\n{inputs['season']}",
-        f"[판매채널]\n{', '.join(inputs['channels'])}",
-        f"[출시일]\n{inputs['launch_date']}",
-        f"[시장환경]\n{inputs['market_env']}",
-        f"[적용트렌드]\n{', '.join(inputs['trends'])}",
-        f"[20대여성 특징]\n{inputs['target_20f']}",
-        f"[30대남성 특징]\n{inputs['target_30m']}",
-        f"[포장선호]\n{inputs['packaging']}",
-        "\n[A 컨셉안]\n제품명, 포지셔닝, 주요 USP, 관능 키워드, 마케팅 포인트",
-        "\n[B 마케팅 검토]\n3C분석, SWOT분석, 수치 평가(회사적합성, 제조난이도, 원가, 수용성 등)",
-        "\n[C 제품배합비 개발]\n제품유형/기준배합비/관능버전 2개/설명 요약으로 구성",
-        "\n모든 출력은 JSON 형식으로 구성하라."
-    ]
-    return "\n".join(lines)
+        api_key = st.text_input("🔑 OpenAI API 키", type="password")
 
-# 메인 실행
+    # ✅ 실행 버튼
+    if st.button("🚀 실행", type="primary", disabled=not api_key):
+        inputs = {
+            "goal": goal,
+            "category": category,
+            "price": price,
+            "season": season,
+            "channels": channels,
+            "launch_date": launch_date,
+            "market_env": market_env,
+            "trends": trends,
+        }
 
-def run_streamlit_app():
-    st.title("🥤 ABC 페르소나 순환 제품개발 앱")
-    user_input = collect_inputs()
-    key = hash_input(user_input)
-    api_key = st.secrets["OPENAI_API_KEY"]
+        prompt = generate_prompt(inputs)
 
-    if "ai_cache" not in st.session_state:
-        st.session_state["ai_cache"] = {}
+        # ✅ 디버깅용 프롬프트 출력
+        st.subheader("📄 생성된 Prompt")
+        st.code(prompt, language="markdown")
 
-    col1, col2 = st.columns([1, 2])
+        # ⏱ 호출
+        with st.spinner("AI 생성 중..."):
+            result, elapsed, err = call_openai_once(api_key, prompt)
 
-    with col1:
-        st.subheader("🚀 실행")
-        if st.button("AI에게 맡기기"):
-            if key in st.session_state["ai_cache"]:
-                st.success("✅ 이전 결과 사용 (캐시)")
-                ai_result, elapsed = st.session_state["ai_cache"][key]
-            else:
-                with st.spinner("AI가 생각중입니다..."):
-                    prompt = create_ai_prompt(user_input)
-                    ai_result, elapsed = call_openai_once(api_key=api_key, prompt=prompt)
-                    st.session_state["ai_cache"][key] = (ai_result, elapsed)
-            st.session_state["result"] = (ai_result, elapsed)
-
-    with col2:
         st.subheader("📊 대시보드")
-        if "result" in st.session_state:
-            data, elapsed = st.session_state["result"]
-            st.markdown(f"**⏱ 소요시간**: {elapsed}초")
+        st.write(f"⏱ 소요시간: {elapsed:.2f}초")
+
+        if err:
+            st.error(err)
+            st.stop()
+
+        # ✅ 결과 출력
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
             st.markdown("### A. 제품 컨셉")
-            st.json(data.get("A", {}))
+            if result["A"]:
+                st.json(result["A"])
+            else:
+                st.warning("⚠️ 제품 컨셉 결과가 비어 있습니다.")
+
+        with col2:
             st.markdown("### B. 마케팅 평가")
-            st.json(data.get("B", {}))
+            if result["B"]:
+                st.json(result["B"])
+            else:
+                st.warning("⚠️ 마케팅 평가 결과가 비어 있습니다.")
+
+        with col3:
             st.markdown("### C. 제품 배합비")
-            st.json(data.get("C", {}))
-        else:
-            st.info("STEP 0까지 입력 후 실행해주세요")
+            if result["C"]:
+                st.json(result["C"])
+            else:
+                st.warning("⚠️ 제품 배합비 결과가 비어 있습니다.")
 
-# 진입점
 
-def main():
-    run_streamlit_app()
-
+# ▶️ 실행
 if __name__ == "__main__":
     main()
