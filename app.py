@@ -286,8 +286,7 @@ def A_to_B_payload(a: Dict[str, Any]) -> str:
         "  \"decision\": \"GO|HOLD|DROP\","
         "  \"3c_swot_summary\": {\"3c\": {\"company\":\"...\",\"customer\":\"...\",\"competitor\":\"...\"}, \"swot\": {\"strengths\":[\"...\"], \"weaknesses\":[\"...\"], \"opportunities\":[\"...\"], \"threats\":[\"...\"]}},"
         "  \"improvement_comments\": [\"...\"]"
-        "}"
-    ) -> str:
+        "}" ) -> str:
     return (
         "[컨텍스트]\n"
         f"- 제품유형: {product_type}\n"
