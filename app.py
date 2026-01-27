@@ -266,27 +266,50 @@ def stage0_to_A_payload(
 
 def A_to_B_payload(a: Dict[str, Any]) -> str:
     return (
-        "[A 컨셉안]\n"
-        f"- 제품명: {a.get('product_name','')}\n"
-        f"- 포지셔닝: {a.get('positioning','')}\n"
-        f"- 관능키워드: {', '.join(a.get('sensory_keywords', []))}\n"
-        f"- 마케팅포인트: {', '.join(a.get('marketing_points', []))}\n\n"
-        "[요구]\n"
-        "3C·SWOT 관점으로 평가하고 아래 평가항목을 1~5점으로 채점 후 가중치로 종합점수 산출.\n"
-        "- Company 적합성(0.2)\n"
-        "- 원가 안정성(0.2)\n"
-        "- 제조 난이도(0.15)\n"
-        "- Customer 수용성(0.15)\n"
-        "- 반복구매 가능성(0.2)\n"
-        "결과로 GO/HOLD/DROP 판정 및 개선 코멘트 3개.\n\n"
-        "[출력 JSON 스키마]\n"
-        "{\n"
-        "  \"scores\": {\"company_fit\":1,\"cost_stability\":1,\"manufacturability\":1,\"customer_acceptance\":1,\"repurchase\":1},\n"
-        "  \"weighted_score\": 0.0,\n"
-        "  \"decision\": \"GO|HOLD|DROP\",\n"
-        "  \"3c_swot_summary\": {\"3c\": {\"company\":\"...\",\"customer\":\"...\",\"competitor\":\"...\"}, \"swot\": {\"strengths\":[\"...\"], \"weaknesses\":[\"...\"], \"opportunities\":[\"...\"], \"threats\":[\"...\"]}},\n"
-        "  \"improvement_comments\": [\"...\"]\n"
-        "}\n"
+        "[A 컨셉안]
+"
+        f"- 제품명: {a.get('product_name','')}
+"
+        f"- 포지셔닝: {a.get('positioning','')}
+"
+        f"- 관능키워드: {', '.join(a.get('sensory_keywords', []))}
+"
+        f"- 마케팅포인트: {', '.join(a.get('marketing_points', []))}
+
+"
+        "[요구]
+"
+        "3C·SWOT 관점으로 평가하고 아래 평가항목을 1~5점으로 채점 후 가중치로 종합점수 산출.
+"
+        "- Company 적합성(0.2)
+"
+        "- 원가 안정성(0.2)
+"
+        "- 제조 난이도(0.15)
+"
+        "- Customer 수용성(0.15)
+"
+        "- 반복구매 가능성(0.2)
+"
+        "결과로 GO/HOLD/DROP 판정 및 개선 코멘트 3개.
+
+"
+        "[출력 JSON 스키마]
+"
+        "{
+"
+        "  \"scores\": {\"company_fit\":1,\"cost_stability\":1,\"manufacturability\":1,\"customer_acceptance\":1,\"repurchase\":1},
+"
+        "  \"weighted_score\": 0.0,
+"
+        "  \"decision\": \"GO|HOLD|DROP\",
+"
+        "  \"3c_swot_summary\": {\"3c\": {\"company\":\"...\",\"customer\":\"...\",\"competitor\":\"...\"}, \"swot\": {\"strengths\":[\"...\"], \"weaknesses\":[\"...\"], \"opportunities\":[\"...\"], \"threats\":[\"...\"]}},
+"
+        "  \"improvement_comments\": [\"...\"]
+"
+        "}
+"
     ) -> str:
     return (
         "[컨텍스트]\n"
@@ -327,6 +350,27 @@ def C_recommend_from_researcher_payload(
     b: Dict[str, Any],
     researcher: Dict[str, float],
 ) -> str:
+    return (
+        "[컨텍스트]\n"
+        f"- 제품유형: {product_type}\n"
+        f"- 제품종류: {product_category}\n\n"
+        "[A/B 요약]\n"
+        f"- A 제품명: {a.get('product_name','')}\n"
+        f"- A 포지셔닝: {a.get('positioning','')}\n"
+        f"- B 코멘트: {', '.join(b.get('improvement_comments', []))}\n\n"
+        "[연구원 배합비(현재 슬라이더 값)]\n"
+        + json.dumps(researcher, ensure_ascii=False)
+        + "\n\n"
+        "[요구]\n"
+        "연구원 배합비를 기준으로 관능특성 A/B 대안 배합비를 다시 제안하세요.\n"
+        "원료 키는 동일. water는 제외.\n\n"
+        "[출력 JSON 스키마]\n"
+        "{\n"
+        "  \"sensory_A\": {\"label\":\"Sharp & Active\", \"formula\": { ...same keys... }},\n"
+        "  \"sensory_B\": {\"label\":\"Juicy & Smooth\", \"formula\": { ...same keys... }},\n"
+        "  \"commentary\": \"...\"\n"
+        "}\n"
+    ) -> str:
     return (
         "[컨텍스트]\n"
         f"- 제품유형: {product_type}\n"
