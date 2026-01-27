@@ -1,5 +1,6 @@
 # abc-persona-circular-product-development-training-app/app.py
 
+
 import streamlit as st
 import pandas as pd
 import time
@@ -9,7 +10,7 @@ import openai
 from typing import Dict, Any
 
 st.set_page_config(page_title="ABC Persona Product Dev", layout="wide")
-
+st.code(prompt, language="markdown")
 # 캐시 키 생성용 해시
 
 def hash_input(obj: Any) -> str:
