@@ -1,4 +1,5 @@
 import streamlit as st
+st.write("🔐 OpenAI 키 확인:", st.secrets.get("openai_api_key", "❌ 없음"))
 import pandas as pd
 import openai
 
