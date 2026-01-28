@@ -1,97 +1,108 @@
-# pages/foodtech/01_dashboard.py (v3.0)
 import streamlit as st
 import pandas as pd
-from openai import OpenAI
+import openai
 
-# ✅ secrets에서 OpenAI 키 가져오기
-client = OpenAI(api_key=st.secrets["openai_api_key"])
+# ===============================
+# OpenAI 설정 (구버전 0.28.x)
+# ===============================
+openai.api_key = st.secrets["openai_api_key"]
 
+# ===============================
+# 데이터 로드
+# ===============================
 @st.cache_data
 def load_data():
     df = pd.read_csv("data/foodtech_company.csv")
-    df.columns = df.columns.str.strip()  # 공백 제거
+    df.columns = df.columns.str.strip()  # 컬럼 공백 제거
     return df
 
-# ✅ AI 기술 설명 함수
+# ===============================
+# AI 기술 요약
+# ===============================
 def generate_tech_summary(tech):
     prompt = f"""
-    '{tech}'라는 푸드테크 기술에 대해 다음을 한국어로 요약해줘:
-    1. 기술 정의
-    2. 적용 가능한 식품 카테고리
-    3. R&D 개발 포인트
-    4. 최신 관련 기술 동향
-    5. 적용 가능한 식품 제품 아이디어
-    각 항목당 1~2문장으로 요약해줘.
-    """
+'{tech}'라는 푸드테크 기술에 대해 다음을 한국어로 정리해줘.
+
+1. 기술 정의
+2. 적용 가능한 식품 카테고리
+3. R&D 활용 포인트
+4. 최신 기술 및 연구 동향
+5. 식품 제품 개발 아이디어
+
+각 항목은 1~2문장으로.
+"""
 
     try:
-        response = client.chat.completions.create(
+        response = openai.ChatCompletion.create(
             model="gpt-4",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.6
         )
-        return response.choices[0].message.content.strip()
+        return response.choices[0].message["content"]
     except Exception as e:
-        return f"❌ 오류 발생: {e}"
+        return f"❌ AI 호출 오류: {e}"
 
-# ✅ 본 앱의 main 함수
+# ===============================
+# 메인 앱
+# ===============================
 def main():
     st.set_page_config(page_title="🥣 FoodTech 기업 대시보드", layout="wide")
     st.title("🥣 FoodTech 기업 분석 대시보드")
 
-    # 데이터 로드
     df = load_data()
 
-    # 필터 영역
+    # ---------- 필터 ----------
     st.sidebar.header("📂 필터")
-    mid_options = df["중분류"].dropna().unique().tolist()
-    selected_mid = st.sidebar.selectbox("중분류 선택", ["전체"] + sorted(mid_options))
 
-    filtered_df = df.copy()
+    mid_options = sorted(df["중분류"].dropna().unique())
+    selected_mid = st.sidebar.selectbox("중분류", ["전체"] + list(mid_options))
+
+    filtered = df.copy()
     if selected_mid != "전체":
-        filtered_df = filtered_df[filtered_df["중분류"] == selected_mid]
+        filtered = filtered[filtered["중분류"] == selected_mid]
 
-    sub_options = filtered_df["소분류"].dropna().unique().tolist()
-    selected_sub = st.sidebar.selectbox("소분류 선택", ["전체"] + sorted(sub_options))
+    sub_options = sorted(filtered["소분류"].dropna().unique())
+    selected_sub = st.sidebar.selectbox("소분류", ["전체"] + list(sub_options))
 
     if selected_sub != "전체":
-        filtered_df = filtered_df[filtered_df["소분류"] == selected_sub]
+        filtered = filtered[filtered["소분류"] == selected_sub]
 
-    st.subheader(f"🔍 검색된 기업 수: {len(filtered_df)}개")
+    st.markdown(f"### ✅ 검색 결과: {len(filtered)}개 기업")
 
-    # ✅ 검색 결과 테이블 출력
-    display_df = filtered_df[[
-        "기업이름", "중분류", "소분류", "기업정보", "대표기술", "사이트주소"
-    ]].reset_index(drop=True)
+    # ---------- 테이블 ----------
+    table_df = filtered[
+        ["기업이름", "중분류", "소분류", "기업정보", "대표기술", "사이트주소"]
+    ].reset_index(drop=True)
 
-    selected_row = st.data_editor(
-        display_df,
-        column_config={
-            "대표기술": st.column_config.TextColumn("대표기술 (클릭하여 복사 후 아래 입력)", width="medium")
-        },
-        use_container_width=True,
-        hide_index=True,
-        disabled=["기업이름", "중분류", "소분류", "기업정보", "사이트주소"]
-    )
+    st.dataframe(table_df, use_container_width=True)
 
-    # ✅ 대표기술 입력
-    selected_tech = st.text_input("🔎 기술 요약을 보고 싶은 대표기술명을 여기에 붙여넣으세요:")
+    # ---------- 기술 선택 ----------
+    tech_list = sorted(filtered["대표기술"].dropna().unique())
+    selected_tech = st.selectbox("🔍 대표기술 선택 (AI 분석)", ["선택 안함"] + tech_list)
 
-    if selected_tech:
+    if selected_tech != "선택 안함":
         st.divider()
-        st.markdown(f"## 🤖 `{selected_tech}` 기술 개요 (AI 요약)")
-        with st.spinner("AI가 기술 요약을 작성 중입니다..."):
-            summary = generate_tech_summary(selected_tech)
-        st.markdown(summary)
 
-        # 이미지 출력
-        st.markdown("### 🖼️ 관련 제품 이미지")
-        st.image(
-            f"https://source.unsplash.com/featured/?{selected_tech.replace(' ', '+')}",
-            caption=f"{selected_tech} 관련 이미지",
-            use_column_width=True,
-        )
+        # 좌우 분할
+        left, right = st.columns([1.2, 1])
 
-# ✅ 앱 실행
+        with left:
+            st.markdown(f"## 🤖 기술 개요: {selected_tech}")
+            with st.spinner("AI가 기술을 분석 중입니다..."):
+                summary = generate_tech_summary(selected_tech)
+            st.markdown(summary)
+
+        with right:
+            st.markdown("## 🖼️ 관련 이미지")
+            query = selected_tech.replace(" ", "+")
+            st.image(
+                f"https://source.unsplash.com/featured/?{query}",
+                caption=f"{selected_tech} 관련 이미지",
+                use_container_width=True
+            )
+
+# ===============================
+# 실행
+# ===============================
 if __name__ == "__main__":
     main()
