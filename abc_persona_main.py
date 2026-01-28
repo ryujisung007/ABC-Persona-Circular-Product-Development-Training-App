@@ -1,10 +1,11 @@
-# 필요한 라이브러리
+# abc_persona_app/app.py (v0.28 대응 전체코드)
+
 import streamlit as st
 import pandas as pd
 import json
 import time
-import openai
 import matplotlib.pyplot as plt
+import openai
 
 # CSV 로딩 함수
 def load_data():
@@ -16,12 +17,14 @@ def load_data():
     ]
     return df_a, df_b, df_roles
 
+# 요약 텍스트 생성
 def build_persona_context(df_a, df_b, df_roles):
     a_summary = df_a.head(3).to_string(index=False)
     b_summary = df_b.head(3).to_string(index=False)
     r_summary = df_roles.head(3).to_string(index=False)
     return a_summary, b_summary, r_summary
 
+# 사용자 입력 요약
 def build_user_context(user_inputs):
     return f"""
 제품 목표: {user_inputs['goal']}
@@ -34,6 +37,7 @@ def build_user_context(user_inputs):
 출시 목표일: {user_inputs['launch_date']}
 """
 
+# 프롬프트 생성
 def build_final_prompt(a_summary, b_summary, r_summary, user_context):
     return f"""
 # ABC 페르소나 기반 순환 제품개발
@@ -60,7 +64,7 @@ def build_final_prompt(a_summary, b_summary, r_summary, user_context):
 ]
 """
 
-# ✅ 최신 openai 버전에 맞춘 호출 방식
+# OpenAI 호출 (v0.28 형식)
 def call_openai(api_key, prompt):
     openai.api_key = api_key
     try:
@@ -75,6 +79,7 @@ def call_openai(api_key, prompt):
     except Exception as e:
         return None, str(e)
 
+# 배합비 시각화
 def show_blend_table():
     st.subheader("🧪 STEP C: 3종 배합비 비교")
     data = {
@@ -90,9 +95,9 @@ def show_blend_table():
     st.subheader("📈 배합비 구성비 비교 그래프")
     fig, ax = plt.subplots(figsize=(10, 5))
     x = range(len(df))
-    ax.bar([i - 0.25 for i in x], df["기준 배합비"], width=0.25, label="기준", align="center")
-    ax.bar(x, df["AI 추천 배합비"], width=0.25, label="AI 추천", align="center")
-    ax.bar([i + 0.25 for i in x], df["연구원 배합비"], width=0.25, label="연구원", align="center")
+    ax.bar([i - 0.25 for i in x], df["기준 배합비"], width=0.25, label="기준")
+    ax.bar(x, df["AI 추천 배합비"], width=0.25, label="AI 추천")
+    ax.bar([i + 0.25 for i in x], df["연구원 배합비"], width=0.25, label="연구원")
     ax.set_xticks(x)
     ax.set_xticklabels(df["원료명"])
     ax.set_ylabel("배합비 (%)")
@@ -101,18 +106,17 @@ def show_blend_table():
     st.pyplot(fig)
 
     st.subheader("🧾 원료군 라벨 설명")
-    emoji_dict = {
-        "베이스": "💧", "향미": "🍓", "기능성": "🌿", "pH 조절": "⚗️"
-    }
+    emoji_dict = {"베이스": "💧", "향미": "🍓", "기능성": "🌿", "pH 조절": "⚗️"}
     for i in range(len(df)):
         name = df.loc[i, "원료명"]
         group = df.loc[i, "원료군"]
         emoji = emoji_dict.get(group, "❓")
         st.markdown(f"- {emoji} **{name}** → `{group}`")
 
+# 메인 앱 실행
 def main():
     st.set_page_config(page_title="ABC 페르소나 순환 제품개발", layout="wide")
-    st.title("🥤 ABC 페르소나 순환 제품개발 앱 v3.0")
+    st.title("🥤 ABC 페르소나 순환 제품개발 앱 (v0.28)")
 
     df_a, df_b, df_roles = load_data()
     a_summary, b_summary, r_summary = build_persona_context(df_a, df_b, df_roles)
