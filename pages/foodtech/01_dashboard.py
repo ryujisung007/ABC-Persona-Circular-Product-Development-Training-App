@@ -83,7 +83,7 @@ selected_tech = None
 
 if not filtered_df.empty:
     selected_row = st.dataframe(
-        filtered_df[["기업이름", "중분류", "소분류", "기업정보", "대표기술", "사이트주소"]],
+        filtered_df[["기업이름", "중분류", "소분류", "기업정보", "대표기술", "사이트 주소"]],
         use_container_width=True
     )
 
