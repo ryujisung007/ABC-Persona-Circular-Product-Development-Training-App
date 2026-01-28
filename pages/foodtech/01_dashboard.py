@@ -1,4 +1,4 @@
-# pages/foodtech/01_dashboard.py (리팩토링 완료 버전)
+# pages/foodtech/01_dashboard.py
 
 import streamlit as st
 import pandas as pd
@@ -92,6 +92,6 @@ def main():
             use_column_width=True,
         )
 
-# ✅ Streamlit Cloud에서 import될 때도 실행되도록
-if __name__ == "__main__":
-    main()
+# ✅ 반드시 main 함수 존재하게 만들기 (app.py에서 호출됨)
+def get_page():
+    return main
