@@ -8,7 +8,7 @@ def main():
         page_icon="🌟",
         layout="wide"
     )
-    st.title(":green[푸드테크 기업 리스트(2026)] 🏢")
+    st.title(":green[푸드테크 기업 분석 대시보드] 🏢")
 
     # 데이터 로드
     @st.cache_data
@@ -20,7 +20,7 @@ def main():
     df = load_data()
 
     # 필터: 중분류 → 소분류
-    st.sidebar.header("📁 "살펴보기")
+    st.sidebar.header("📁 기업 필터링")
     mid_categories = df["중분류"].dropna().unique().tolist()
     selected_mid = st.sidebar.selectbox("중분류 선택", ["전체"] + sorted(mid_categories))
 
@@ -33,7 +33,7 @@ def main():
     if selected_sub != "전체":
         df = df[df["소분류"] == selected_sub]
 
-    st.subheader(f"🔍 기업 수: {len(df)}개")
+    st.subheader(f"🔍 필터링된 기업 수: {len(df)}개")
 
     # 기업 정보 테이블
     st.dataframe(
