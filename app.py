@@ -4,8 +4,6 @@ import streamlit as st
 import importlib
 
 st.set_page_config(page_title="🧪 식품개발 멀티앱 플랫폼", layout="wide")
-st.title("🥼 식품개발 멀티앱 플랫폼 v5.0")
-
 # 앱 이름과 경로 설정
 apps = {
     "🔁 ABC 페르소나 순환 개발": "abc_persona_main",
