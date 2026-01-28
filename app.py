@@ -1,21 +1,32 @@
-# app.py - 드롭다운으로 서브앱 구동하는 메인 앱
+# app.py (v5.0) - 드롭다운으로 각 앱 실행
+
 import streamlit as st
-from abc_persona_main import run as run_abc_persona
+import importlib
 
-# Streamlit 설정
-st.set_page_config(page_title="Multi Persona Apps", layout="wide")
+st.set_page_config(page_title="🧪 식품개발 멀티앱 플랫폼", layout="wide")
+st.title("🥼 식품개발 멀티앱 플랫폼 v5.0")
 
-# 앱 목록
+# 앱 이름과 경로 설정
 apps = {
-    "ABC Persona App": run_abc_persona,
-    # 추후 다른 앱 추가 가능
-    # "Other App": run_other_app
+    "🔁 ABC 페르소나 순환 개발": "abc_persona_main",
+    "🥣 FoodTech 대시보드": "pages.foodtech.01_dashboard",
+    "🔍 FoodTech 기술/제품 추천": "pages.foodtech.02_recommendation",
+    "📊 FoodTech 요약 리포트": "pages.foodtech.03_summary"
 }
 
-# 사이드바 앱 선택
-st.sidebar.title("📂 실행할 앱 선택")
-app_choice = st.sidebar.selectbox("앱을 선택하세요", list(apps.keys()))
+# 사이드바에서 앱 선택 (key 추가)
+selection = st.sidebar.selectbox("📂 실행할 앱 선택", list(apps.keys()), key="app_selector")
 
-# 선택한 앱 실행
-selected_app = apps[app_choice]
-selected_app()
+# 선택된 모듈 import 후 실행
+def run_selected_app(module_path):
+    try:
+        module = importlib.import_module(module_path)
+        if hasattr(module, "main"):
+            module.main()
+        else:
+            st.error(f"❌ '{module_path}'에는 main() 함수가 없습니다.")
+    except Exception as e:
+        st.error(f"❌ 앱 실행 중 오류 발생: {e}")
+
+# 앱 실행
+run_selected_app(apps[selection])
