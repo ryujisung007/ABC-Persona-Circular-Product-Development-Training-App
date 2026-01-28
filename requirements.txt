@@ -16,3 +16,4 @@ numpy>=1.24
 
 # optional (향후 확장 대비)
 scipy>=1.10
+googletrans
