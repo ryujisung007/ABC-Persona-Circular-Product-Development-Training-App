@@ -52,6 +52,7 @@ st.subheader(f"🔎 필터링된 기업 수: {len(filtered_df)}개")
 
 # ✅ 선택된 기술 표시 변수
 selected_tech = st.session_state.get("selected_tech", None)
+related_product = st.session_state.get("related_product", "")
 
 # ✅ 기업 테이블 + 기술 클릭 감지
 for idx, row in filtered_df.iterrows():
@@ -72,7 +73,14 @@ related_product = st.session_state.get("related_product", "")
 if selected_tech:
     st.divider()
     st.markdown(f"## 🤖 기술 개요 (AI 생성): `{selected_tech}`")
-    ai_text = generate_ai_description(selected_tech)
+    
+    with st.spinner("🧠 GPT가 기술 개요를 작성 중입니다..."):
+        ai_text = generate_ai_description(selected_tech)
+
+    st.markdown("### ✅ GPT 응답 확인 (디버깅용)")
+    st.code(ai_text)
+
+    st.markdown("### 📌 기술 요약")
     st.markdown(ai_text)
 
     st.markdown("## 🖼️ 관련 제품 이미지")
