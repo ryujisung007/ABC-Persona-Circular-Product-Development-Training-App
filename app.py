@@ -6,7 +6,7 @@ import importlib
 st.set_page_config(page_title="🧪 식품개발 멀티앱 플랫폼", layout="wide")
 # 앱 이름과 경로 설정
 apps = {
-    "🔁 ABC 페르소나 순환 개발": "abc_persona_main",
+    "🔁 가상 페르소나 개발모드": "abc_persona_main",
     "🥣 FoodTech 대시보드": "pages.foodtech.01_dashboard",
     "🔍 FoodTech 기술/제품 추천": "pages.foodtech.02_recommendation",
     "📊 FoodTech 요약 리포트": "pages.foodtech.03_summary"
