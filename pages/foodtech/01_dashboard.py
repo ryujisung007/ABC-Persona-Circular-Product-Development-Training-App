@@ -71,7 +71,7 @@ def main():
 
     # ---------- 테이블 ----------
     table_df = filtered[
-        ["기업이름", "중분류", "소분류", "기업정보", "대표기술", "사이트주소"]
+        ["기업이름", "중분류", "소분류", "기업정보", "대표기술", "사이트 주소"]
     ].reset_index(drop=True)
 
     st.dataframe(table_df, use_container_width=True)
