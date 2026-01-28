@@ -3,7 +3,8 @@ streamlit>=1.32
 pandas>=2.0
 
 # OpenAI API
-openai>=1.0
+openai==0.28.1
+
 
 # visualization (그래프/대시보드)
 matplotlib>=3.7
