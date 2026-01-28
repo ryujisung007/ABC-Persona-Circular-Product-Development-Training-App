@@ -1,178 +1,79 @@
-# abc_persona_app/app.py (v0.28 대응 전체코드)
-
+# pages/foodtech/01_dashboard.py
 import streamlit as st
 import pandas as pd
-import json
-import time
-import matplotlib.pyplot as plt
 import openai
+from googletrans import Translator
 
-# CSV 로딩 함수
-def load_data():
-    df_a = pd.read_csv("data/A_persona_concept.csv")
-    df_b = pd.read_csv("data/B_persona_maketing.csv")
-    df_roles = pd.read_csv("data/A_B_C_persona.csv")
-    df_researchers = df_roles[
-        df_roles.columns[df_roles.columns.str.contains("역할|role")][0]
-    ]
-    return df_a, df_b, df_roles
-
-# 요약 텍스트 생성
-def build_persona_context(df_a, df_b, df_roles):
-    a_summary = df_a.head(3).to_string(index=False)
-    b_summary = df_b.head(3).to_string(index=False)
-    r_summary = df_roles.head(3).to_string(index=False)
-    return a_summary, b_summary, r_summary
-
-# 사용자 입력 요약
-def build_user_context(user_inputs):
-    return f"""
-제품 목표: {user_inputs['goal']}
-카테고리: {user_inputs['category']}
-희망 가격: {user_inputs['price']}
-출시 시즌: {user_inputs['season']}
-판매 채널: {', '.join(user_inputs['channels'])}
-시장 환경: {user_inputs['market_env']}
-트렌드 키워드: {', '.join(user_inputs['trends'])}
-출시 목표일: {user_inputs['launch_date']}
-"""
-
-# 프롬프트 생성
-def build_final_prompt(a_summary, b_summary, r_summary, user_context):
-    return f"""
-# ABC 페르소나 기반 순환 제품개발
-
-## A. 기획자 관점 주요 제품 사례
-{a_summary}
-
-## B. 마케터 관점 마케팅 분석 요약
-{b_summary}
-
-## C. 연구원 관점 기술적 참고 페르소나
-{r_summary}
-
-## 사용자 입력 정보
-{user_context}
-
-[지금 할 일]
-1. 최근 트렌드 기반으로 10개 제품 컨셉을 생성해줘.
-2. 각 컨셉은 맛 조합 / 기능성 포인트 / 타깃 소비층을 포함해야 해.
-3. 아래 JSON 구조로 응답해줘:
-[
-  {{ "name": ..., "flavor": ..., "functionality": ..., "target": ..., "score": ... }},
-  ... (총 10개)
-]
-"""
-
-# OpenAI 호출 (v0.28 형식)
-def call_openai(api_key, prompt):
-    openai.api_key = api_key
-    try:
-        response = openai.ChatCompletion.create(
-            model="gpt-4",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.7
-        )
-        content = response.choices[0].message["content"].strip()
-        result = json.loads(content)
-        return result, None
-    except Exception as e:
-        return None, str(e)
-
-# 배합비 시각화
-def show_blend_table():
-    st.subheader("🧪 STEP C: 3종 배합비 비교")
-    data = {
-        "원료명": ["정제수", "오미자농축액", "사과농축액", "감초추출물", "프락토올리고당", "구연산"],
-        "기준 배합비": [60, 10, 10, 10, 5, 5],
-        "AI 추천 배합비": [52, 12, 8, 10, 8, 5],
-        "연구원 배합비": [48, 15, 12, 10, 10, 5],
-        "원료군": ["베이스", "향미", "향미", "기능성", "기능성", "pH 조절"]
-    }
-    df = pd.DataFrame(data)
-    st.dataframe(df.set_index("원료명"), use_container_width=True)
-
-    st.subheader("📈 배합비 구성비 비교 그래프")
-    fig, ax = plt.subplots(figsize=(10, 5))
-    x = range(len(df))
-    ax.bar([i - 0.25 for i in x], df["기준 배합비"], width=0.25, label="기준")
-    ax.bar(x, df["AI 추천 배합비"], width=0.25, label="AI 추천")
-    ax.bar([i + 0.25 for i in x], df["연구원 배합비"], width=0.25, label="연구원")
-    ax.set_xticks(x)
-    ax.set_xticklabels(df["원료명"])
-    ax.set_ylabel("배합비 (%)")
-    ax.set_title("3종 배합비 구성 비교")
-    ax.legend()
-    st.pyplot(fig)
-
-    st.subheader("🧾 원료군 라벨 설명")
-    emoji_dict = {"베이스": "💧", "향미": "🍓", "기능성": "🌿", "pH 조절": "⚗️"}
-    for i in range(len(df)):
-        name = df.loc[i, "원료명"]
-        group = df.loc[i, "원료군"]
-        emoji = emoji_dict.get(group, "❓")
-        st.markdown(f"- {emoji} **{name}** → `{group}`")
-
-# 메인 앱 실행
+# ✅ main() 함수 정의
 def main():
-    st.set_page_config(page_title="ABC 페르소나 순환 제품개발", layout="wide")
-    st.title("🥤 ABC 페르소나 순환 제품개발 앱 (v0.28)")
+    # ✅ OpenAI 및 번역기 설정
+    openai.api_key = st.secrets["openai_api_key"]
+    translator = Translator()
 
-    df_a, df_b, df_roles = load_data()
-    a_summary, b_summary, r_summary = build_persona_context(df_a, df_b, df_roles)
+    # ✅ 데이터 로드
+    @st.cache_data
+    def load_data():
+        df = pd.read_csv("data/foodtech_company.csv")
+        df.columns = df.columns.str.strip()
+        return df
 
-    with st.sidebar:
-        st.header("STEP 0. 기획자 입력")
-        goal = st.selectbox("제품 개발 목표", ["신제품 개발", "기존 제품 개선"])
-        category = st.selectbox("제품 카테고리", ["RTD 티", "기능성 워터", "프리바이오틱 소다"])
-        price = st.radio("희망 가격대", ["2,000원 미만", "2,000원 이상"])
-        season = st.radio("출시 시즌", ["봄", "여름", "가을", "겨울"])
-        channels = st.multiselect("판매 채널", ["편의점", "대형마트", "온라인몰", "카페"])
-        market_env = st.text_area("시장 환경 요약", value="2030 여성층 증가, 건강 트렌드 강화 등")
-        trends = st.multiselect("적용 트렌드", ["저당", "장건강", "에너지", "향미", "기능성"])
-        launch_date = st.text_input("출시 목표일", value="2026-06")
-        api_key = st.text_input("🔑 OpenAI API Key", type="password")
-
-    if "concepts" not in st.session_state:
-        if st.button("🚀 STEP A: 제품 컨셉 생성"):
-            user_inputs = {
-                "goal": goal, "category": category, "price": price,
-                "season": season, "channels": channels,
-                "market_env": market_env, "trends": trends, "launch_date": launch_date
-            }
-            user_context = build_user_context(user_inputs)
-            prompt = build_final_prompt(a_summary, b_summary, r_summary, user_context)
-            result, err = call_openai(api_key, prompt)
-            if err:
-                st.error(err)
-            else:
-                st.session_state.concepts = result
-                st.success("✅ 컨셉 생성 완료")
-    else:
-        st.subheader("🎨 생성된 제품 컨셉 (Top 5)")
-        concepts = st.session_state.concepts[:5]
-        options = [f"{c['name']} ({c['score']})" for c in concepts]
-        selected = st.radio("STEP B로 전이할 컨셉을 선택하세요:", options)
-        if selected:
-            st.session_state.selected_concept = next(
-                item for item in concepts if item['name'] in selected
+    def generate_tech_summary(tech):
+        prompt = f"""
+        '{tech}' 라는 푸드테크 기술에 대해 다음을 한국어로 요약해줘:
+        1. 기술 정의
+        2. 적용 가능한 식품 카테고리
+        3. R&D 개발 포인트
+        4. 최신 관련 기술 동향
+        5. 적용 가능한 식품 제품 아이디어
+        각 항목당 1~2문장으로 요약해줘.
+        """
+        try:
+            response = openai.ChatCompletion.create(
+                model="gpt-3.5-turbo",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.7
             )
-            st.success("선택 완료 → 마케팅 단계로 이동하세요")
+            return response.choices[0].message.content.strip()
+        except Exception as e:
+            return f"❌ AI 오류: {e}"
 
-    if "selected_concept" in st.session_state:
-        st.header("📢 STEP B: 마케팅 포인트 생성")
-        c = st.session_state.selected_concept
-        st.markdown(f"**제품명**: {c['name']}")
-        st.markdown(f"**맛 조합**: {c['flavor']} / 기능: {c['functionality']}")
-        st.markdown(f"**타깃층**: {c['target']}")
-        st.success("💡 마케팅 컨셉: 2030 여성 건강+맛+휴대성 강조")
+    st.set_page_config(page_title="🥣 FoodTech 기업 대시보드", layout="wide")
+    st.title("🥣 FoodTech 기업 분석 대시보드")
 
-        if st.button("STEP C로 이동 → 배합비 자동 생성"):
-            st.session_state.to_step_c = True
+    df = load_data()
 
-    if "to_step_c" in st.session_state:
-        st.header("🧪 STEP C: 배합비 자동 생성")
-        show_blend_table()
+    st.sidebar.header("📂 필터")
+    mid_list = df["중분류"].dropna().unique().tolist()
+    mid_selected = st.sidebar.selectbox("중분류 선택", ["전체"] + sorted(mid_list))
 
-if __name__ == "__main__":
-    main()
+    if mid_selected != "전체":
+        df = df[df["중분류"] == mid_selected]
+
+    sub_list = df["소분류"].dropna().unique().tolist()
+    sub_selected = st.sidebar.selectbox("소분류 선택", ["전체"] + sorted(sub_list))
+
+    if sub_selected != "전체":
+        df = df[df["소분류"] == sub_selected]
+
+    st.subheader(f"🔎 필터링된 기업 수: {len(df)}개")
+
+    # ✅ 테이블 출력
+    if not df.empty:
+        table_df = df[["기업이름", "중분류", "소분류", "기업정보", "대표기술", "사이트"]].reset_index(drop=True)
+        selected_row = st.dataframe(table_df, use_container_width=True)
+
+        # ✅ 기술 선택 처리
+        selected_tech = st.selectbox("🔧 대표기술 선택", df["대표기술"].dropna().unique().tolist())
+        if selected_tech:
+            st.divider()
+            st.markdown(f"## 🤖 `{selected_tech}` 기술 개요 (AI 요약)")
+            with st.spinner("AI 요약 생성 중..."):
+                summary = generate_tech_summary(selected_tech)
+            st.markdown(summary)
+
+            # ✅ 번역 후 이미지 검색
+            translated = translator.translate(selected_tech, dest="en").text.replace(" ", "+")
+            st.image(f"https://source.unsplash.com/featured/?{translated}", caption="AI 이미지", use_column_width=True)
+
+    else:
+        st.warning("🔍 해당 조건에 맞는 데이터가 없습니다.")
