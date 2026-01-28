@@ -38,3 +38,9 @@ if selection == "🔁 ABC 페르소나 순환 개발":
     abc_main()
 else:
     run_selected_app(apps[selection])
+# 기존 코드 그대로 유지하되 맨 아래만 수정
+
+def run():
+    main()
+
+# 기존 if __name__ == "__main__": main() 제거
