@@ -1,113 +1,105 @@
-# pages/foodtech/01_dashboard.py
-
 import streamlit as st
 import pandas as pd
-import openai
+from openai import OpenAI
 
-# -------------------------
-# OpenAI Key (Cloud/Local 안전 대응)
-# -------------------------
-def get_openai_key():
-    if "openai_api_key" in st.secrets:
-        return st.secrets["openai_api_key"]
-    else:
-        st.warning("⚠️ OpenAI API Key가 설정되지 않아 AI 기능은 비활성화됩니다.")
-        return None
-
-openai.api_key = get_openai_key()
-
-# -------------------------
-# Data Load
-# -------------------------
-@st.cache_data
-def load_data():
-    return pd.read_csv("data/foodtech_company.csv")
-
-# -------------------------
-# AI 설명 생성
-# -------------------------
-def generate_ai_description(tech_name):
-    if not openai.api_key:
-        return "❌ OpenAI API Key가 없어 AI 설명을 생성할 수 없습니다."
-
-    prompt = f"""
-    '{tech_name}' 푸드테크 기술에 대해 아래를 정리해줘.
-    1. 기술 정의
-    2. 적용 가능한 식품 카테고리
-    3. R&D 활용 포인트
-    한국어, 항목별 1~2문장
-    """
-
-    try:
-        response = openai.ChatCompletion.create(
-            model="gpt-4",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.6
-        )
-        return response.choices[0].message["content"]
-    except Exception as e:
-        return f"❌ AI 호출 오류: {e}"
-
-# -------------------------
-# MAIN (필수)
-# -------------------------
+# ✅ main 함수로 전체 감싸기
 def main():
-    st.set_page_config(page_title="🥣 FoodTech 대시보드", layout="wide")
-    st.title("🥣 FoodTech 기업 분석 대시보드")
+    st.set_page_config(page_title="푸드테크 기업 대시보드", layout="wide")
+    st.title("🌟 푸드테크 기업 분석 대시보드")
 
-    df = load_data()
+    # ✅ OpenAI API 클라이언트 설정
+    try:
+        client = OpenAI(api_key=st.secrets["openai_api_key"])
+    except Exception as e:
+        st.error(f"❌ OpenAI 키 오류: {e}")
+        return
 
-    # -------------------------
-    # Sidebar Filter
-    # -------------------------
-    st.sidebar.header("📂 필터")
+    # ✅ 데이터 로드
+    @st.cache_data
+    def load_data():
+        try:
+            df = pd.read_csv("data/foodtech_company.csv")
+            return df
+        except FileNotFoundError:
+            st.error("❌ 데이터 파일을 찾을 수 없습니다. 'data/foodtech_company.csv' 경로를 확인하세요.")
+            return pd.DataFrame()
 
-    mid_list = sorted(df["중분류"].dropna().unique())
-    selected_mid = st.sidebar.selectbox("중분류", ["전체"] + mid_list, key="ft_mid")
-
-    if selected_mid != "전체":
-        df = df[df["중분류"] == selected_mid]
-
-    sub_list = sorted(df["소분류"].dropna().unique())
-    selected_sub = st.sidebar.selectbox("소분류", ["전체"] + sub_list, key="ft_sub")
-
-    if selected_sub != "전체":
-        df = df[df["소분류"] == selected_sub]
-
-    st.subheader(f"🔎 필터링 결과: {len(df)}개 기업")
-
-    # -------------------------
-    # Company List
-    # -------------------------
-    for idx, row in df.iterrows():
-        with st.expander(f"{row['기업이름']} | {row['중분류']} > {row['소분류']}"):
-            st.markdown(f"**기업정보**: {row['기업정보']}")
-            st.markdown(f"**대표제품**: {row.get('대표제품','')}")
-
-            if st.button("🧠 대표기술 분석", key=f"tech_{idx}"):
-                st.session_state["selected_tech"] = row["대표기술"]
-                st.session_state["related_product"] = row.get("대표제품","")
-
-    # -------------------------
-    # AI Result Area
-    # -------------------------
-    if "selected_tech" in st.session_state:
-        st.divider()
-        tech = st.session_state["selected_tech"]
-        product = st.session_state.get("related_product","")
-
-        col1, col2 = st.columns([1,1])
-
-        with col1:
-            st.markdown(f"## 🤖 기술 개요: `{tech}`")
-            with st.spinner("AI 분석 중..."):
-                ai_text = generate_ai_description(tech)
-            st.markdown(ai_text)
-
-        with col2:
-            st.markdown("## 🖼️ 관련 이미지")
-            query = f"{product} {tech}" if product else tech
-            st.image(
-                f"https://source.unsplash.com/featured/?{query}",
-                use_column_width=True
+    # ✅ GPT 기술 설명 생성
+    def generate_ai_description(tech_name):
+        try:
+            prompt = f"""
+            '{tech_name}'라는 푸드테크 대표기술에 대해 다음 내용을 요약해줘:
+            1. 기술 정의
+            2. 적용 가능한 식품 카테고리
+            3. R&D 개발 포인트
+            한국어로 간결하게 설명해줘 (각 항목마다 1~2문장씩)
+            """
+            response = client.chat.completions.create(
+                model="gpt-4",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.7
             )
+            return response.choices[0].message.content
+        except Exception as e:
+            return f"❌ 설명 생성 오류: {e}"
+
+    # ✅ 데이터 불러오기
+    df = load_data()
+    if df.empty:
+        return
+
+    # ✅ 사이드바 필터
+    st.sidebar.header("📂 필터")
+    mid_categories = df["중분류"].dropna().unique().tolist()
+    selected_mid = st.sidebar.selectbox("중분류 선택", ["전체"] + sorted(mid_categories))
+
+    filtered_df = df[df["중분류"] == selected_mid] if selected_mid != "전체" else df
+
+    sub_categories = filtered_df["소분류"].dropna().unique().tolist()
+    selected_sub = st.sidebar.selectbox("소분류 선택", ["전체"] + sorted(sub_categories))
+
+    filtered_df = filtered_df[filtered_df["소분류"] == selected_sub] if selected_sub != "전체" else filtered_df
+
+    st.subheader(f"🔎 필터링된 기업 수: {len(filtered_df)}개")
+
+    # ✅ 세션 상태 변수 초기화
+    if "selected_tech" not in st.session_state:
+        st.session_state.selected_tech = None
+    if "related_product" not in st.session_state:
+        st.session_state.related_product = ""
+
+    # ✅ 기업 리스트
+    for idx, row in filtered_df.iterrows():
+        with st.expander(f"{row['기업이름']} | {row['중분류']} > {row['소분류']}"):
+            st.markdown(f"**기업정보:** {row['기업정보']}")
+            tech_col = st.columns([0.2, 0.8])
+            if tech_col[0].button("👁️ 기술 보기", key=f"tech_{idx}"):
+                st.session_state.selected_tech = row["대표기술"]
+                st.session_state.related_product = row.get("대표제품", "")
+            tech_col[1].markdown(f"**대표기술:** {row['대표기술']}")
+            st.markdown(f"**대표제품:** {row.get('대표제품', '')}")
+
+    # ✅ 기술 상세 설명 영역
+    selected_tech = st.session_state.get("selected_tech", None)
+    related_product = st.session_state.get("related_product", "")
+
+    if selected_tech:
+        st.divider()
+        st.markdown(f"## 🤖 기술 개요 (AI 생성): `{selected_tech}`")
+
+        with st.spinner("🧠 GPT가 기술 개요를 작성 중입니다..."):
+            ai_text = generate_ai_description(selected_tech)
+
+        st.markdown("### ✅ GPT 응답 확인 (디버깅용)")
+        st.code(ai_text)
+
+        st.markdown("### 📌 기술 요약")
+        st.markdown(ai_text)
+
+        st.markdown("## 🖼️ 관련 제품 이미지")
+        image_query = f"{related_product} {selected_tech}" if related_product else selected_tech
+        st.image(f"https://source.unsplash.com/featured/?{image_query}", caption=image_query, use_column_width=True)
+
+# ✅ 외부에서 호출 시 실행
+if __name__ == "__main__":
+    main()
