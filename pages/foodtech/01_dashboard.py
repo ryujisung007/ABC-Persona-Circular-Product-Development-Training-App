@@ -3,61 +3,59 @@ import pandas as pd
 
 # 페이지 설정
 st.set_page_config(
-    page_title="푸드테크 기업 검색",
-    page_icon="🍽️",
+    page_title="푸드테크 기업 대시보드",
+    page_icon="🌟",
     layout="wide"
 )
 
-# 데이터 불러오기 함수
-@st.cache_data
-def load_data():
-    df = pd.read_csv("data/foodtech_company.csv")
-    df = df.drop(columns=["Unnamed: 0"], errors="ignore")
-    return df
-
-# 데이터 로드
-df = load_data()
-
-# 필수 컬럼 확인
-required_cols = ["중분류", "소분류", "기업이름", "기업정보", "대표기술"]
-missing_cols = [col for col in required_cols if col not in df.columns]
-if missing_cols:
-    st.error(f"❌ CSV 파일에 다음 필수 열이 없습니다: {missing_cols}")
-    st.stop()
-
-# 제목 및 설명
-st.title(":green[푸드테크 기업 검색 대시보드] 🍽️")
+st.title(":green[푸드테크 기업 분석 대시보드] 🏢")
 st.markdown("""
-중분류와 소분류를 선택하면 관련 푸드테크 기업 정보를 아래에서 확인할 수 있습니다.
+이 페이지는 `foodtech_company.csv` 파일을 기반으로 **푸드테크 기업 정보**를 필터링 및 시각화합니다.  
+`중분류` → `소분류`를 선택하면 관련된 기업 리스트가 테이블 형태로 아래에 출력됩니다.
 """)
 
-# 중분류 선택
+# ✅ 데이터 로드 함수
+@st.cache_data
+def load_data():
+    try:
+        # 탭 구분자 기반 CSV 처리
+        df = pd.read_csv("data/foodtech_company.csv", sep="\t", encoding="utf-8")
+    except:
+        # 다른 인코딩 시도 (Windows 저장된 경우 등)
+        df = pd.read_csv("data/foodtech_company.csv", sep="\t", encoding="utf-16")
+    return df
+
+# 데이터 불러오기
+df = load_data()
+
+# 열 이름 확인 (디버깅용)
+# st.write("열 이름:", df.columns.tolist())
+
+# 사이드바 필터
+st.sidebar.header("🔎 필터 조건")
+
+# 중분류 및 소분류 드롭다운
 mid_categories = df["중분류"].dropna().unique().tolist()
-selected_mid = st.selectbox("중분류 선택", ["전체"] + sorted(mid_categories))
+selected_mid = st.sidebar.selectbox("중분류 선택", ["전체"] + sorted(mid_categories))
 
-# 소분류 선택
+# 소분류 목록 필터링
 if selected_mid != "전체":
-    filtered_mid = df[df["중분류"] == selected_mid]
-    sub_categories = filtered_mid["소분류"].dropna().unique().tolist()
+    sub_df = df[df["중분류"] == selected_mid]
 else:
-    sub_categories = df["소분류"].dropna().unique().tolist()
+    sub_df = df.copy()
 
-selected_sub = st.selectbox("소분류 선택", ["전체"] + sorted(sub_categories))
+sub_categories = sub_df["소분류"].dropna().unique().tolist()
+selected_sub = st.sidebar.selectbox("소분류 선택", ["전체"] + sorted(sub_categories))
 
 # 필터 적용
-filtered_df = df.copy()
-if selected_mid != "전체":
-    filtered_df = filtered_df[filtered_df["중분류"] == selected_mid]
+filtered_df = sub_df.copy()
 if selected_sub != "전체":
     filtered_df = filtered_df[filtered_df["소분류"] == selected_sub]
 
-st.subheader(f"🔍 검색된 기업 수: {len(filtered_df)}개")
-
-# 결과 테이블 출력
-if not filtered_df.empty:
-    st.dataframe(
-        filtered_df[["기업이름", "중분류", "소분류", "기업정보", "대표기술"]],
-        use_container_width=True
-    )
-else:
-    st.warning("⚠️ 조건에 맞는 기업이 없습니다.")
+# 출력 결과 요약
+st.subheader(f"📌 필터링된 기업 수: {len(filtered_df)}개")
+st.dataframe(
+    filtered_df[["기업이름", "중분류", "소분류", "기업정보", "대표기술", "대표제품"]],
+    use_container_width=True,
+    hide_index=True
+)
