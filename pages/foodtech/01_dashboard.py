@@ -33,7 +33,7 @@ def main():
     if selected_sub != "전체":
         df = df[df["소분류"] == selected_sub]
 
-    st.subheader(f"🔍 필터링된 기업 수: {len(df)}개")
+    st.subheader(f"🔍 기업 수: {len(df)}개")
 
     # 기업 정보 테이블
     st.dataframe(
