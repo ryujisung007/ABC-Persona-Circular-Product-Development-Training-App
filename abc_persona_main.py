@@ -1,9 +1,9 @@
-# abc_persona_app/app.py (v3.0) - 자동 플로우 연결
+# 필요한 라이브러리
 import streamlit as st
 import pandas as pd
 import json
 import time
-from openai import OpenAI
+import openai
 import matplotlib.pyplot as plt
 
 # CSV 로딩 함수
@@ -16,14 +16,12 @@ def load_data():
     ]
     return df_a, df_b, df_roles
 
-# 페르소나 요약
 def build_persona_context(df_a, df_b, df_roles):
     a_summary = df_a.head(3).to_string(index=False)
     b_summary = df_b.head(3).to_string(index=False)
     r_summary = df_roles.head(3).to_string(index=False)
     return a_summary, b_summary, r_summary
 
-# 사용자 입력 텍스트
 def build_user_context(user_inputs):
     return f"""
 제품 목표: {user_inputs['goal']}
@@ -36,7 +34,6 @@ def build_user_context(user_inputs):
 출시 목표일: {user_inputs['launch_date']}
 """
 
-# 프롬프트 생성
 def build_final_prompt(a_summary, b_summary, r_summary, user_context):
     return f"""
 # ABC 페르소나 기반 순환 제품개발
@@ -63,22 +60,21 @@ def build_final_prompt(a_summary, b_summary, r_summary, user_context):
 ]
 """
 
-# OpenAI 호출
+# ✅ 최신 openai 버전에 맞춘 호출 방식
 def call_openai(api_key, prompt):
-    client = OpenAI(api_key=api_key)
+    openai.api_key = api_key
     try:
-        response = client.chat.completions.create(
+        response = openai.ChatCompletion.create(
             model="gpt-4",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7
         )
-        content = response.choices[0].message.content.strip()
+        content = response.choices[0].message["content"].strip()
         result = json.loads(content)
         return result, None
     except Exception as e:
         return None, str(e)
 
-# 배합비 시각화
 def show_blend_table():
     st.subheader("🧪 STEP C: 3종 배합비 비교")
     data = {
@@ -114,15 +110,13 @@ def show_blend_table():
         emoji = emoji_dict.get(group, "❓")
         st.markdown(f"- {emoji} **{name}** → `{group}`")
 
-# 앱 실행
 def main():
     st.set_page_config(page_title="ABC 페르소나 순환 제품개발", layout="wide")
     st.title("🥤 ABC 페르소나 순환 제품개발 앱 v3.0")
-    
+
     df_a, df_b, df_roles = load_data()
     a_summary, b_summary, r_summary = build_persona_context(df_a, df_b, df_roles)
 
-    # 사용자 입력값
     with st.sidebar:
         st.header("STEP 0. 기획자 입력")
         goal = st.selectbox("제품 개발 목표", ["신제품 개발", "기존 제품 개선"])
@@ -135,7 +129,6 @@ def main():
         launch_date = st.text_input("출시 목표일", value="2026-06")
         api_key = st.text_input("🔑 OpenAI API Key", type="password")
 
-    # STEP A
     if "concepts" not in st.session_state:
         if st.button("🚀 STEP A: 제품 컨셉 생성"):
             user_inputs = {
@@ -162,7 +155,6 @@ def main():
             )
             st.success("선택 완료 → 마케팅 단계로 이동하세요")
 
-    # STEP B (자동 실행)
     if "selected_concept" in st.session_state:
         st.header("📢 STEP B: 마케팅 포인트 생성")
         c = st.session_state.selected_concept
@@ -174,7 +166,6 @@ def main():
         if st.button("STEP C로 이동 → 배합비 자동 생성"):
             st.session_state.to_step_c = True
 
-    # STEP C
     if "to_step_c" in st.session_state:
         st.header("🧪 STEP C: 배합비 자동 생성")
         show_blend_table()
