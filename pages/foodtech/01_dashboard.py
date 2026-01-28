@@ -37,6 +37,9 @@ def main():
     df = load_data()
 
     # 필터링 옵션
+    if "중분류" not in df.columns:
+    st.error("❌ CSV 파일에 '중분류' 열이 존재하지 않습니다. 파일 구조를 확인해주세요.")
+    st.stop()
     st.sidebar.header("📂 카테고리 필터")
     mid_categories = df["중분류"].dropna().unique().tolist()
     selected_mid = st.sidebar.selectbox("중분류 선택", ["전체"] + sorted(mid_categories))
