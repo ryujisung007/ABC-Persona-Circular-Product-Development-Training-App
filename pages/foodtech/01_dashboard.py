@@ -1,37 +1,50 @@
-# pages/foodtech/01_dashboard.py
-
 import streamlit as st
 import pandas as pd
 
-# 페이지 설정
-st.set_page_config(
-    page_title="푸드테크 기업 대시보드",
-    page_icon="🌱",
-    layout="wide"
-)
-
-# 데이터 로드 함수
 @st.cache_data
 def load_data():
-    df = pd.read_csv("data/foodtech_company.csv")  # 경로 주의!
-    df = df.drop(columns=["순번"], errors="ignore")
+    df = pd.read_csv("data/foodtech_company.csv")
+    df = df.drop(columns=["Unnamed: 0"], errors="ignore")
     return df
 
-# 데이터 로드
-df = load_data()
+def main():
+    st.set_page_config(
+        page_title="푸드테크 기업 대시보드",
+        page_icon="🌟",
+        layout="wide"
+    )
 
-# 중분류, 소분류 필터링
-st.sidebar.header("🔍 필터")
-category = st.sidebar.selectbox("중분류 선택", ["전체"] + sorted(df["중분류"].dropna().unique().tolist()))
-sub_category = st.sidebar.selectbox("소분류 선택", ["전체"] + sorted(df["소분류"].dropna().unique().tolist()))
+    st.title(":green[푸드테크 기업 분석 대시보드] 🏢")
+    st.markdown("""
+    이 페이지는 `foodtech_company.csv` 파일을 기반으로 **푸드테크 기업 정보**를 시각화합니다.  
+    `중분류 → 소분류`를 선택하면 관련 기업 리스트가 아래에 출력됩니다.
+    """)
 
-filtered_df = df.copy()
-if category != "전체":
-    filtered_df = filtered_df[filtered_df["중분류"] == category]
-if sub_category != "전체":
-    filtered_df = filtered_df[filtered_df["소분류"] == sub_category]
+    # 데이터 불러오기
+    df = load_data()
 
-# 결과 출력
-st.title("🥗 푸드테크 기업 리스트")
-st.subheader(f"🔎 총 {len(filtered_df)}개 기업이 검색되었습니다.")
-st.dataframe(filtered_df[["기업이름", "중분류", "소분류", "기업정보", "대표기술", "대표제품", "사이트 주소"]])
+    # 필터 설정
+    st.sidebar.header("필터")
+    main_categories = df["중분류"].dropna().unique().tolist()
+    selected_main = st.sidebar.selectbox("중분류 선택", ["전체"] + sorted(main_categories))
+
+    filtered_df = df.copy()
+    if selected_main != "전체":
+        filtered_df = filtered_df[filtered_df["중분류"] == selected_main]
+
+    sub_categories = filtered_df["소분류"].dropna().unique().tolist()
+    selected_sub = st.sidebar.selectbox("소분류 선택", ["전체"] + sorted(sub_categories))
+
+    if selected_sub != "전체":
+        filtered_df = filtered_df[filtered_df["소분류"] == selected_sub]
+
+    st.subheader(f"🔍 필터링된 기업 수: {len(filtered_df)}개")
+
+    st.dataframe(
+        filtered_df[["기업이름", "중분류", "소분류", "기업정보", "대표기술", "대표제품"]],
+        use_container_width=True
+    )
+
+# Streamlit 실행 시 main() 호출되도록 설정
+if __name__ == "__main__":
+    main()
